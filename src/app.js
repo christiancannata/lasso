@@ -21,13 +21,16 @@ const express = require('express');
 const perfConfig = require('./config.performance.js');
 const {LighthouseAudit} = require('./lighthouse-audit');
 const {CloudTasksClient} = require('@google-cloud/tasks');
-const {writeResultStream} = require('./utils/bq');
+
+//const {writeResultStream} = require('./utils/bq');
 const {getChunkedList, isURL} = require('./utils/api');
 const {listActiveTasks, processTaskResults} = require('./utils/tasks');
 const {
-  auditRequestValidation,
-  asyncAuditRequestValidation,
-  activeTasksRequestValidation} = require('./utils/validate');
+    auditRequestValidation,
+    asyncAuditRequestValidation,
+    activeTasksRequestValidation
+} = require('./utils/validate');
+
 
 const app = express();
 
@@ -37,8 +40,8 @@ app.use(express.urlencoded({limit: '5mb', extended: true}));
 
 app.use(express.static('client'));
 
-app.get('/', function(req, res) {
-  res.sendFile(path.join(__dirname + '/client/index.html'));
+app.get('/', function (req, res) {
+    res.sendFile(path.join(__dirname + '/client/index.html'));
 });
 
 app.post('/audit', auditRequestValidation, performAudit);
@@ -51,31 +54,32 @@ app.get('/active-tasks', activeTasksRequestValidation, getActiveTasks);
  * @param {Object} res
  */
 async function performAudit(req, res) {
-  const BQ_DATASET = process.env.BQ_DATASET;
-  const BQ_TABLE = process.env.BQ_TABLE;
-  const payload = req.body;
+    // const BQ_DATASET = process.env.BQ_DATASET;
+    // const BQ_TABLE = process.env.BQ_TABLE;
+    const payload = req.body;
 
-  const lhAudit = new LighthouseAudit(
-      payload.urls,
-      payload.blockedRequests,
-      perfConfig.auditConfig,
-      perfConfig.auditResultsMapping);
+    const lhAudit = new LighthouseAudit(
+        payload.urls,
+        payload.blockedRequests,
+        perfConfig.auditConfig,
+        perfConfig.auditResultsMapping);
 
-  try {
-    await lhAudit.run();
-    const results = lhAudit.getBQFormatResults();
-    await writeResultStream(BQ_DATASET, BQ_TABLE, results);
+    try {
 
-    return res.json(results);
-  } catch (e) {
-    res.status(500);
-    return res.json({
-      'error': {
-        'code': 500,
-        'message': e.message,
-      },
-    });
-  }
+        await lhAudit.run();
+        //const results = lhAudit.getBQFormatResults();
+        //await writeResultStream(BQ_DATASET, BQ_TABLE, results);
+        const results = lhAudit.getRawResults();
+        return res.json(results);
+    } catch (e) {
+        res.status(500);
+        return res.json({
+            'error': {
+                'code': 500,
+                'message': e.message,
+            },
+        });
+    }
 }
 
 /**
@@ -87,56 +91,56 @@ async function performAudit(req, res) {
  * @return {JSON}
  */
 async function scheduleAudits(req, res) {
-  const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
-  const CLOUD_TASKS_QUEUE = process.env.CLOUD_TASKS_QUEUE;
-  const CLOUD_TASKS_QUEUE_LOCATION = process.env.CLOUD_TASKS_QUEUE_LOCATION;
-  const SERVICE_URL = process.env.SERVICE_URL;
+    const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
+    const CLOUD_TASKS_QUEUE = process.env.CLOUD_TASKS_QUEUE;
+    const CLOUD_TASKS_QUEUE_LOCATION = process.env.CLOUD_TASKS_QUEUE_LOCATION;
+    const SERVICE_URL = process.env.SERVICE_URL;
 
-  const chunks = getChunkedList(req.body.urls, 1, isURL);
-  const tasksClient = new CloudTasksClient();
-  const serviceUrl = `${SERVICE_URL}/audit`;
+    const chunks = getChunkedList(req.body.urls, 1, isURL);
+    const tasksClient = new CloudTasksClient();
+    const serviceUrl = `${SERVICE_URL}/audit`;
 
-  const parent = tasksClient.queuePath(
-      GOOGLE_CLOUD_PROJECT,
-      CLOUD_TASKS_QUEUE_LOCATION,
-      CLOUD_TASKS_QUEUE,
-  );
+    const parent = tasksClient.queuePath(
+        GOOGLE_CLOUD_PROJECT,
+        CLOUD_TASKS_QUEUE_LOCATION,
+        CLOUD_TASKS_QUEUE,
+    );
 
-  let inSeconds = 10;
-  const createTasks = [];
-  let blockedRequests = [];
+    let inSeconds = 10;
+    const createTasks = [];
+    let blockedRequests = [];
 
-  if (typeof req.body.blockedRequests != 'undefined') {
-    blockedRequests = req.body.blockedRequests;
-  }
+    if (typeof req.body.blockedRequests != 'undefined') {
+        blockedRequests = req.body.blockedRequests;
+    }
 
-  for (let i = 0; i < chunks.length; i++) {
-    const payload = JSON.stringify({
-      'urls': chunks[i],
-      'blockedRequests': blockedRequests,
-    });
+    for (let i = 0; i < chunks.length; i++) {
+        const payload = JSON.stringify({
+            'urls': chunks[i],
+            'blockedRequests': blockedRequests,
+        });
 
-    const task = {
-      httpRequest: {
-        httpMethod: 'POST',
-        url: serviceUrl,
-        headers: {'Content-Type': 'application/json'},
-        body: Buffer.from(payload).toString('base64'),
-        scheduleTime: (inSeconds + (Date.now() / 1000)),
-      },
-    };
+        const task = {
+            httpRequest: {
+                httpMethod: 'POST',
+                url: serviceUrl,
+                headers: {'Content-Type': 'application/json'},
+                body: Buffer.from(payload).toString('base64'),
+                scheduleTime: (inSeconds + (Date.now() / 1000)),
+            },
+        };
 
-    inSeconds += 10;
+        inSeconds += 10;
 
-    const request = {parent, task};
-    const [response] = await tasksClient.createTask(request);
-    createTasks.push({
-      name: response.name,
-      urls: chunks[i],
-    });
-  }
+        const request = {parent, task};
+        const [response] = await tasksClient.createTask(request);
+        createTasks.push({
+            name: response.name,
+            urls: chunks[i],
+        });
+    }
 
-  return res.json({'tasks': createTasks});
+    return res.json({'tasks': createTasks});
 }
 
 /**
@@ -146,25 +150,25 @@ async function scheduleAudits(req, res) {
  * @return {JSON}
  */
 async function getActiveTasks(req, res) {
-  try {
-    const tasksResults = await listActiveTasks(
-        process.env.GOOGLE_CLOUD_PROJECT,
-        process.env.CLOUD_TASKS_QUEUE_LOCATION,
-        process.env.CLOUD_TASKS_QUEUE,
-        req.query.pageSize,
-        req.query.pageToken,
-    );
-    const processedResults = processTaskResults(tasksResults[2]);
-    return res.json(processedResults);
-  } catch (e) {
-    res.status(500);
-    return res.json({
-      'error': {
-        'code': 500,
-        'message': e.message,
-      },
-    });
-  }
+    try {
+        const tasksResults = await listActiveTasks(
+            process.env.GOOGLE_CLOUD_PROJECT,
+            process.env.CLOUD_TASKS_QUEUE_LOCATION,
+            process.env.CLOUD_TASKS_QUEUE,
+            req.query.pageSize,
+            req.query.pageToken,
+        );
+        const processedResults = processTaskResults(tasksResults[2]);
+        return res.json(processedResults);
+    } catch (e) {
+        res.status(500);
+        return res.json({
+            'error': {
+                'code': 500,
+                'message': e.message,
+            },
+        });
+    }
 }
 
 module.exports = app;
