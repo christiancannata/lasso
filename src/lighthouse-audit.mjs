@@ -13,17 +13,16 @@
  * limitations under the License.
  *
  **/
-
 'use strict';
 
-const puppeteer = require('puppeteer');
-const {BigQuery} = require('@google-cloud/bigquery');
-const lighthouse = require('lighthouse');
+import puppeteer from 'puppeteer';
+//const {BigQuery} = require('@google-cloud/bigquery');
+import lighthouse from 'lighthouse';
 
 /**
  * Lighthouse Audit
  */
-class LighthouseAudit {
+let LighthouseAudit = class {
     /**
      * Constructor
      * @param {Array} urls
@@ -98,23 +97,24 @@ class LighthouseAudit {
      * auditFileMapping configuration supplied in the constructor.
      * @return {Array}
      */
-    getBQFormatResults() {
-        const today = new Date().toJSON().slice(0, 10);
-        return this.auditResults.map((audit) => {
-            if (typeof (audit) != 'undefined') {
-                const formattedAudit = Object.entries(this.auditFieldMapping).reduce((res, keyVal) => {
-                    res[keyVal[0]] = audit[keyVal[1]].numericValue;
-                    return res;
-                }, {});
 
-                formattedAudit['date'] = BigQuery.date(today);
-                formattedAudit['url'] = audit.url;
-                formattedAudit['blockedRequests'] = this.blockedRequestPatterns.join(',');
+    /* getBQFormatResults() {
+         const today = new Date().toJSON().slice(0, 10);
+         return this.auditResults.map((audit) => {
+             if (typeof (audit) != 'undefined') {
+                 const formattedAudit = Object.entries(this.auditFieldMapping).reduce((res, keyVal) => {
+                     res[keyVal[0]] = audit[keyVal[1]].numericValue;
+                     return res;
+                 }, {});
 
-                return formattedAudit;
-            }
-        });
-    }
+                 formattedAudit['date'] = BigQuery.date(today);
+                 formattedAudit['url'] = audit.url;
+                 formattedAudit['blockedRequests'] = this.blockedRequestPatterns.join(',');
+
+                 return formattedAudit;
+             }
+         });
+     }*/
 
     /**
      * @return {Array}
@@ -124,6 +124,4 @@ class LighthouseAudit {
     }
 }
 
-module.exports = {
-    LighthouseAudit,
-};
+module.exports = LighthouseAudit;

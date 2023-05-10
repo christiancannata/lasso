@@ -1,27 +1,18 @@
 {
-  "name": "Lasso",
+  "name": "lasso",
   "version": "1.0.0",
-  "description": "Automate running Lighthouse tests on large number of URLs in parallel",
-  "main": "main.js",
+  "description": "",
+  "main": "server.js",
   "scripts": {
-    "test": "mocha",
-    "start": "nodemon server.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.mjs"
   },
-  "author": "Google Inc",
-  "license": "Apache-2.0",
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@google-cloud/bigquery": "^4.7.0",
-    "@google-cloud/tasks": "^2.1.0",
-    "express": "^4.17.1",
-    "joi": "^17.2.0",
+    "express": "^4.18.2",
     "lighthouse": "^10.2.0",
+    "nodemon": "^2.0.22",
     "puppeteer": "^20.1.2"
-  },
-  "devDependencies": {
-    "chai": "^4.2.0",
-    "eslint": "^6.8.0",
-    "eslint-config-google": "^0.14.0",
-    "mocha": "^8.0.1",
-    "nodemon": "^2.0.22"
   }
 }
